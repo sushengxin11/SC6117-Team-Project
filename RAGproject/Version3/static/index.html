@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thesis Draft Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { processHtmlClass: 'tex2jax_process' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root { --sidebar-width: 280px; --sidebar-collapsed-width: 68px; --primary-blue: #1a73e8; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Roboto, sans-serif; overflow-y: auto; }
+
+        /* Sidebar */
+        #sidebar {
+            width: var(--sidebar-width); height: 100vh; position: fixed; left: 0; top: 0;
+            background: #fff; border-right: 1px solid #e1e4e8; transition: all 0.3s ease; z-index: 1000;
+            display: flex; flex-direction: column;
+        }
+        #sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+        .menu-toggle { cursor: pointer; font-size: 1.4rem; padding: 12px; margin: 8px; border-radius: 50%; transition: 0.2s; }
+        .menu-toggle:hover { background: #f1f3f4; }
+        .new-task-btn { margin: 12px; padding: 12px; border-radius: 24px; background: #e8f0fe; color: var(--primary-blue); border: none; display: flex; align-items: center; justify-content: center; font-weight: 600; transition: 0.2s; }
+
+        .history-list { flex-grow: 1; overflow-y: auto; padding: 12px; }
+        .history-item { padding: 12px 16px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; position: relative; transition: 0.2s; color: #444; font-weight: 500; }
+        .history-item:hover { background: #f1f3f4; }
+        .history-item.active { background: #e8f0fe; color: var(--primary-blue); }
+        .delete-btn { position: absolute; right: 12px; display: none; border: none; background: transparent; color: #9aa0a6; padding: 4px; border-radius: 50%; transition: 0.2s; }
+        .history-item:hover .delete-btn { display: block; }
+        .delete-btn:hover { color: #d93025; background: #fce8e6; }
+
+        /* Main Wrapper */
+        #main-wrapper { margin-left: var(--sidebar-width); transition: all 0.3s ease; padding: 40px; min-height: 100vh; }
+        #main-wrapper.expanded { margin-left: var(--sidebar-collapsed-width); }
+        .content-container { max-width: 900px; margin: 0 auto; }
+
+        /* Unified Section Card Style (全站统一蓝色边框) */
+        .section-card {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 16px;
+            border-left: 5px solid var(--primary-blue);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+
+        /* Methodology/Paper Font */
+        .paper-content { font-family: 'Times New Roman', serif; font-size: 1.1rem; line-height: 1.8; }
+        .paper-content h5 { font-family: 'Segoe UI', sans-serif; color: var(--primary-blue); margin-bottom: 15px; font-weight: bold; }
+
+        .input-card { background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px; }
+        .progress-card { background: #e8f0fe; border-radius: 16px; padding: 20px; margin-bottom: 30px; border: 1px solid #d2e3fc; }
+
+        .sparkle-container { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .bi-stars { color: var(--primary-blue); font-size: 2.4rem; animation: sparkle-rotate 3s infinite ease-in-out; }
+        @keyframes sparkle-rotate { 0% { transform: rotate(0deg); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg); } }
+
+        .nav-pills .nav-link { border-radius: 20px; color: #5f6368; padding: 10px 24px; font-weight: 600; margin: 0 5px; }
+        .nav-pills .nav-link.active { background-color: var(--primary-blue); color: white; }
+        .collapsed .sidebar-text { display: none; }
+    </style>
+</head>
+<body class="tex2jax_ignore">
+
+    <nav id="sidebar">
+        <div class="menu-toggle" id="toggleSidebar"><i class="bi bi-list"></i></div>
+        <button class="new-task-btn" onclick="window.location.reload()"><i class="bi bi-plus-lg fs-5"></i><span class="ms-2 sidebar-text">New Task</span></button>
+        <div class="history-list" id="taskList"></div>
+        <div class="p-3 sidebar-text border-top text-muted small text-center">NTU SC6117 Data Science Project</div>
+    </nav>
+
+    <div id="main-wrapper">
+        <div class="content-container tex2jax_process">
+            <div class="text-center mt-3 mb-5">
+                <div class="sparkle-container">
+                    <i class="bi bi-stars"></i>
+                    <h1 class="fw-bold d-inline-block m-0" style="font-size: 3.5rem; color: #202124;">Thesis Draft Generator</h1>
+                </div>
+                <p class="text-muted fs-5">Evidence-driven research gap mining and paper drafting, grounded in arXiv literature.</p>
+            </div>
+
+            <div class="input-card">
+                <div class="row g-4 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label fw-bold text-secondary small text-uppercase">Research Topic</label>
+                        <input type="text" id="topicInput" class="form-control form-control-lg border-light bg-light" placeholder="Try any Topic">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary small text-uppercase">References</label>
+                        <select class="form-select form-select-lg border-light bg-light" id="paperCount">
+                            <option value="1">1</option><option value="2">2</option>
+                            <option value="3">3</option><option value="4">4</option>
+                            <option value="5">5</option><option value="6" selected>6</option>
+                            <option value="7">7</option><option value="8">8</option>
+                            <option value="9">9</option><option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button id="startBtn" onclick="createTask()" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold py-3">Generate</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="statusArea" class="progress-card d-none">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;"></div>
+                    <div>
+                        <span id="statusText" class="fw-bold fs-5 text-primary">Initializing...</span><br>
+                        <small class="text-primary" style="opacity: 0.8;" id="stageDetail">Preparing pipeline...</small>
+                    </div>
+                    <span id="progressText" class="ms-auto badge bg-primary fs-6 px-3 py-2 rounded-pill">0%</span>
+                </div>
+                <div class="progress" style="height: 8px; border-radius: 4px; background-color: #d2e3fc;">
+                    <div id="progressBar" class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="resultArea" class="d-none">
+                <ul class="nav nav-pills mb-5 justify-content-center" id="resultsTab">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-gaps">Research Gaps</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-ideas">Ideas</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-evaluation">Evaluation</button></li> <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="pill" data-bs-target="#tab-draft">Final Draft</button></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-gaps"></div>
+                    <div class="tab-pane fade" id="tab-ideas"></div>
+                    <div class="tab-pane fade" id="tab-evaluation"></div> <div class="tab-pane fade" id="tab-draft"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const mainWrapper = document.getElementById('main-wrapper');
+        document.getElementById('toggleSidebar').onclick = () => { sidebar.classList.toggle('collapsed'); mainWrapper.classList.toggle('expanded'); };
+
+        let currentTaskId = null;
+        let pollInterval = null;
+
+        async function createTask() {
+            const topic = document.getElementById('topicInput').value;
+            const maxPapers = document.getElementById('paperCount').value;
+            if (!topic) return alert("Please specify a topic.");
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('statusArea').classList.remove('d-none');
+            document.getElementById('statusArea').style.opacity = '1';
+            document.getElementById('resultArea').classList.add('d-none');
+            const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ topic, max_papers: parseInt(maxPapers) }) });
+            const data = await res.json();
+            currentTaskId = data.task_id;
+            startPolling(currentTaskId);
+            loadTaskList();
+        }
+
+        function startPolling(taskId) {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                const res = await fetch(`/api/tasks/${taskId}/status`);
+                const s = await res.json();
+                document.getElementById('progressBar').style.width = (s.progress * 100) + '%';
+                document.getElementById('progressText').innerText = Math.round(s.progress * 100) + '%';
+                document.getElementById('statusText').innerText = s.message;
+                const details = { "gap_mining": "Phase 1/4: Scanning arXiv...", "idea_generation": "Phase 2/4: Brainstorming...", "idea_evaluation": "Phase 3/4: Scoring...", "paper_drafting": "Phase 4/4: Drafting...", "completed": "Done!" };
+                document.getElementById('stageDetail').innerText = details[s.stage] || "Processing...";
+                if (s.status === 'completed') { clearInterval(pollInterval); loadAllResults(taskId); document.getElementById('startBtn').disabled = false; setTimeout(() => { const sa = document.getElementById('statusArea'); sa.style.transition = 'opacity 0.8s'; sa.style.opacity = '0'; setTimeout(() => sa.classList.add('d-none'), 800); }, 2500); }
+            }, 2000);
+        }
+
+        async function loadAllResults(taskId) {
+            document.getElementById('resultArea').classList.remove('d-none');
+            const stages = ['gaps', 'ideas', 'evaluation', 'draft'];
+            for (const stage of stages) {
+                const res = await fetch(`/api/tasks/${taskId}/result/${stage}`);
+                if (res.ok) renderStage(stage, await res.json());
+            }
+        }
+
+        function renderStage(stage, data) {
+            const container = document.getElementById('tab-' + stage);
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (stage === 'gaps') {
+                container.innerHTML = data.research_gaps.map((g, i) => `
+                    <div class="section-card">
+                        <h5 class="fw-bold text-primary">Gap ${i+1}: ${g.description}</h5>
+                        <p class="mb-0 text-muted">${g.why_important}</p>
+                    </div>`).join('');
+            } else if (stage === 'ideas') {
+                container.innerHTML = data.ideas.map((i, idx) => `
+                    <div class="section-card">
+                        <h5 class="fw-bold">Idea ${idx+1}: ${i.working_title}</h5>
+                        <p class="text-secondary small mb-2">${i.problem_statement}</p>
+                        <div class="bg-light p-3 rounded border-start border-success border-3"><strong>Innovation:</strong> ${i.novelty}</div>
+                    </div>`).join('');
+            } else if (stage === 'evaluation') {
+                // 现在 Evaluation 条目也使用了蓝色边框卡片样式
+                container.innerHTML = data.evaluations.map(ev => `
+                    <div class="section-card d-flex justify-content-between align-items-start">
+                        <div><h5 class="fw-bold">Review for ${ev.idea_id}</h5><p class="text-muted mb-0 small">${ev.justification}</p></div>
+                        <span class="badge bg-success fs-6 px-3 py-2 rounded-pill">Score: ${parseFloat(ev.overall_score).toFixed(1)}</span>
+                    </div>`).join('');
+            } else if (stage === 'draft') {
+                container.innerHTML = `
+                    <h2 class="text-center fw-bold mb-5 display-6">${data.title}</h2>
+                    <div class="section-card paper-content"><h5>Abstract</h5><p>${data.abstract}</p></div>
+                    <div class="section-card paper-content"><h5>1. Introduction</h5><p>${data.introduction}</p></div>
+                    <div class="section-card paper-content"><h5>2. Methodology</h5><div>${data.method}</div></div>
+                    <div class="section-card paper-content"><h5>3. Experiments</h5><p>${data.experiments}</p></div>
+                `;
+                if (window.MathJax) MathJax.typesetPromise([container]);
+            }
+        }
+
+        async function loadTaskList() {
+            const res = await fetch('/api/tasks');
+            const tasks = await res.json();
+            const list = document.getElementById('taskList');
+            list.innerHTML = tasks.map(t => `<div class="history-item ${currentTaskId === t.task_id ? 'active' : ''}" onclick="viewTask('${t.task_id}')"><i class="bi bi-journal-text me-3 text-primary opacity-75"></i><span class="sidebar-text text-truncate" style="max-width: 170px;">${t.topic}</span><button class="delete-btn" onclick="deleteTask(event, '${t.task_id}')"><i class="bi bi-trash3"></i></button></div>`).join('');
+        }
+
+        async function deleteTask(event, taskId) { event.stopPropagation(); if (confirm("Delete permanently?")) { await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' }); if (currentTaskId === taskId) document.getElementById('resultArea').classList.add('d-none'); loadTaskList(); } }
+
+        async function viewTask(taskId) {
+            if (currentTaskId === taskId) return; currentTaskId = taskId; if (pollInterval) clearInterval(pollInterval);
+            document.getElementById('statusArea').classList.add('d-none'); document.getElementById('resultArea').classList.add('d-none');
+            const res = await fetch(`/api/tasks/${taskId}/status`); const s = await res.json();
+            if (s.status === 'completed') loadAllResults(taskId); else { document.getElementById('statusArea').classList.remove('d-none'); document.getElementById('statusArea').style.opacity = '1'; startPolling(taskId); }
+            loadTaskList();
+        }
+        loadTaskList();
+    </script>
+</body>
+</html>
