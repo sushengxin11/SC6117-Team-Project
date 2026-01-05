@@ -209,7 +209,7 @@ def extract_relevant_sections_from_pdf_fullscan(
     return final[:max_chars]
 
 
-def mine_research_gaps(topic: str, max_papers: int = 6) -> Dict[str, Any]:
+def mine_research_gaps(topic: str, max_papers: int = 6, pre_fetched_papers: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     High-level interface:
     1) Fetch several papers from arXiv based on the topic.
@@ -222,8 +222,8 @@ def mine_research_gaps(topic: str, max_papers: int = 6) -> Dict[str, Any]:
           "research_gaps": [ ... ]
         }
     """
-    print(f"[1] Fetching up to {max_papers} papers for topic: {topic!r}")
-    papers = fetch_arxiv_papers(topic, max_results=max_papers)
+    print(f"[1] Preparing up to {max_papers} papers for topic: {topic!r}")
+    papers = pre_fetched_papers if pre_fetched_papers is not None else fetch_arxiv_papers(topic, max_results=max_papers)
     if not papers:
         raise RuntimeError("No papers fetched from arXiv.")
 

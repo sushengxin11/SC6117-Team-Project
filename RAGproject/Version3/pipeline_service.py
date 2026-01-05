@@ -1,22 +1,40 @@
 # pipeline_service.py
-from typing import Dict, Any
+from typing import Any, Dict, List
+
 from gap_miner import mine_research_gaps
-from idea_generator import generate_ideas_from_gaps
 from idea_evaluator import evaluate_ideas
-from paper_draft_writer import select_top_idea, fetch_supporting_papers_for_idea, generate_paper_draft
+from idea_generator import generate_ideas_from_gaps
+from paper_draft_writer import (
+    fetch_supporting_papers_for_idea,
+    generate_paper_draft,
+    select_top_idea,
+)
+from paper_retriever import fetch_arxiv_papers
+
 
 def run_full_pipeline(topic: str, max_papers: int = 6) -> Dict[str, Any]:
-    gaps = mine_research_gaps(topic, max_papers=max_papers)  # :contentReference[oaicite:2]{index=2}
-    ideas = generate_ideas_from_gaps(gaps)                    # :contentReference[oaicite:3]{index=3}
-    evaluation = evaluate_ideas(ideas)                        # :contentReference[oaicite:4]{index=4}
+    """
+    Convenience synchronous runner (not used by the FastAPI worker).
 
-    top_idea = select_top_idea(ideas, evaluation)             # :contentReference[oaicite:5]{index=5}
-    support = fetch_supporting_papers_for_idea(topic, top_idea, max_papers=6)  # :contentReference[oaicite:6]{index=6}
-    draft = generate_paper_draft(topic, top_idea, support)    # :contentReference[oaicite:7]{index=7}
+    Returns a dict with intermediate artifacts so callers can stream/persist them:
+      papers, gaps, ideas, evaluation, top_idea, supporting_papers, draft
+    """
+    papers: List[Dict[str, Any]] = fetch_arxiv_papers(topic, max_results=max_papers)
+
+    gaps = mine_research_gaps(topic, max_papers=max_papers, pre_fetched_papers=papers)
+    ideas = generate_ideas_from_gaps(gaps)
+    evaluation = evaluate_ideas(ideas)
+
+    top_idea = select_top_idea(ideas, evaluation)
+    supporting = fetch_supporting_papers_for_idea(topic, top_idea, max_papers=6)
+    draft = generate_paper_draft(topic, top_idea, supporting)
 
     return {
+        "papers": {"papers": papers},
         "gaps": gaps,
         "ideas": ideas,
         "evaluation": evaluation,
+        "top_idea": top_idea,
+        "supporting_papers": supporting,
         "draft": draft,
     }

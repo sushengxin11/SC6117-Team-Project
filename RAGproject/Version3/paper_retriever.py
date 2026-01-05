@@ -1,123 +1,122 @@
 # paper_retriever.py
 #
-# Functionality: Extracts paper information (title + abstract + link + PDF link) from arXiv based on keywords.
-# Will be used to build a RAG corpus later.
+# Functionality:
+# - Fetches paper metadata (title, abstract, links, authors, published date) from arXiv API.
+# - Returns a list[dict] that downstream pipeline steps can consume.
 
-import requests
+from __future__ import annotations
+
+import re
+from typing import Dict, List, Optional
+
 import feedparser
-from typing import List, Dict
-import numpy as np
-from sentence_transformers import SentenceTransformer
+import requests
 
 ARXIV_API_URL = "http://export.arxiv.org/api/query"
 
 
+def _to_pdf_url(entry_id: str) -> Optional[str]:
+    """
+    arXiv Atom entry id typically looks like:
+      http://arxiv.org/abs/YYMM.NNNNNvK
+    Convert to:
+      http://arxiv.org/pdf/YYMM.NNNNNvK.pdf
+    """
+    if not entry_id:
+        return None
+    m = re.search(r"arxiv\.org/abs/([^?#]+)", entry_id)
+    if not m:
+        return None
+    return f"http://arxiv.org/pdf/{m.group(1)}.pdf"
+
+
 def fetch_arxiv_papers(query: str, max_results: int = 5) -> List[Dict]:
     """
-    Fetch latest 100 papers from arXiv.
-    Perform loose keyword filtering (OR match).
-    Perform semantic relevance scoring using sentence-transformers.
-    Return the top max_results papers that are both recent and semantically relevant.
-    """
+    Fetch papers from arXiv using the official API.
 
-    # Step1 fetch more papers to filter from
+    Returns items with fields:
+      - title: str
+      - summary: str (abstract)
+      - link: str (arXiv abs page)
+      - pdf_url: str | None
+      - published: str | None (ISO-ish string)
+      - authors: list[str]
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+
+    # Keep the query simple and robust.
+    # "all:" searches title, abstract, authors, etc.
     params = {
-        "search_query": f'all:"{query}"',
+        "search_query": f"all:{q}",
         "start": 0,
-        "max_results": 100,
-        "sortBy": "submittedDate",
+        "max_results": int(max_results),
+        "sortBy": "relevance",
         "sortOrder": "descending",
     }
 
-    try:
-        response = requests.get(ARXIV_API_URL, params=params, timeout=60)
-        response.raise_for_status()
-        feed = feedparser.parse(response.text)
-    except Exception as e:
-        print(f"[Error] Failed to connect to ArXiv: {e}")
-        return []
+    resp = requests.get(ARXIV_API_URL, params=params, timeout=30)
+    resp.raise_for_status()
 
-    # Step2 loose keyword OR filter & extract PDF link
-    query_terms = set(query.lower().split())
+    feed = feedparser.parse(resp.text)
+    papers: List[Dict] = []
 
-    candidates = []
     for entry in feed.entries:
-        title = entry.title.strip().lower()
-        summary = entry.summary.strip().lower()
-        text = title + " " + summary
+        title = (getattr(entry, "title", "") or "").replace("\n", " ").strip()
+        summary = (getattr(entry, "summary", "") or "").strip()
+        link = getattr(entry, "link", None)
+        entry_id = getattr(entry, "id", None)
+        published = getattr(entry, "published", None)
 
-        # OR match: as long as at least 1 keyword appears
-        if not any(term in text for term in query_terms):
-            continue
+        authors = []
+        if hasattr(entry, "authors"):
+            for a in entry.authors:
+                name = getattr(a, "name", None)
+                if name:
+                    authors.append(str(name))
 
         pdf_url = None
-        for link in entry.links:
-            if link.type == 'application/pdf':
-                pdf_url = link.href
-                break
 
-        # Try replacing /abs/ with /pdf/
-        if not pdf_url and 'arxiv.org/abs/' in entry.link:
-            pdf_url = entry.link.replace('arxiv.org/abs/', 'arxiv.org/pdf/')
+        # Prefer explicit PDF link if present
+        if hasattr(entry, "links"):
+            for l in entry.links:
+                href = getattr(l, "href", None)
+                ltype = getattr(l, "type", None)
+                rel = getattr(l, "rel", None)
+                if href and ("pdf" in (ltype or "").lower() or "pdf" in (rel or "").lower() or href.endswith(".pdf")):
+                    pdf_url = href
+                    break
 
-        if pdf_url and not pdf_url.endswith(".pdf"):
-            pdf_url += ".pdf"
-        # ============================
+        if not pdf_url:
+            pdf_url = _to_pdf_url(entry_id)
 
-        candidates.append({
-            "title": entry.title,
-            "summary": entry.summary,
-            "link": entry.link,
-            "pdf_url": pdf_url,
-            "published": entry.published,
-            "authors": [a.name for a in entry.authors],
-        })
+        papers.append(
+            {
+                "title": title,
+                "summary": summary,
+                "link": link,
+                "pdf_url": pdf_url,
+                "published": published,
+                "authors": authors,
+            }
+        )
 
-    if not candidates:
-        return []
-
-    # Step 3 semantic filtering using embeddings
-    try:
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        query_vec = model.encode([query], convert_to_numpy=True)
-        texts = [c["title"] + " " + c["summary"] for c in candidates]
-        doc_vecs = model.encode(texts, convert_to_numpy=True)
-
-        # cosine similarity
-        sims = (query_vec @ doc_vecs.T)[0]
-
-        # sort by similarity (descending)
-        ranked_idx = np.argsort(-sims)
-
-        final_results = []
-        for i in ranked_idx[:max_results]:
-            final_results.append(candidates[i])
-
-        return final_results
-
-    except Exception as e:
-        print(f"[Warning] Semantic filtering failed ({e}), returning raw results.")
-        return candidates[:max_results]
+    return papers
 
 
-def debug_print_papers(papers: List[Dict], limit: int = 5):
-    """
-    Simply print out a few of the scraped papers
-    """
+def debug_print_papers(papers: List[Dict], limit: int = 5) -> None:
     print(f"Fetched {len(papers)} papers.")
     for i, p in enumerate(papers[:limit]):
         print(f"== Paper {i} ==")
-        print(f"  Title: {p['title']}")
-        print(f"  PDF:   {p.get('pdf_url', 'N/A')}")  # Print it out to see if there's a PDF.
+        print(f"  Title: {p.get('title','')}")
+        print(f"  Link:  {p.get('link','')}")
+        print(f"  PDF:   {p.get('pdf_url','')}")
         print("-" * 80)
 
 
 if __name__ == "__main__":
-    print("=== Arxiv Paper Fetcher Demo ===")
-    q = input("Enter a topic (e.g., 'large language models'): ").strip()
-    if not q:
-        q = "large language models"
-
+    print("=== arXiv Paper Fetcher Demo ===")
+    q = input("Enter a topic (e.g., 'large language models'): ").strip() or "large language models"
     papers = fetch_arxiv_papers(q, max_results=5)
     debug_print_papers(papers, limit=5)
-
