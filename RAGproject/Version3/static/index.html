@@ -7,6 +7,29 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function textToHtmlParagraphs(text) {
+      const safe = escapeHtml(text || '');
+      const parts = safe.split(/\n\s*\n/g).map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0) return '<p class="text-muted mb-0">No content.</p>';
+      return parts.map(p => `<p>${p.replaceAll('\n', '<br>')}</p>`).join('');
+    }
+
+    function maybeTypeset(container) {
+      if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+        MathJax.typesetPromise([container]).catch(() => {});
+      }
+    }
+
+
     <script>
         window.MathJax = {
             tex: {
@@ -47,7 +70,7 @@
         #main-wrapper.expanded { margin-left: var(--sidebar-collapsed-width); }
         .content-container { max-width: 900px; margin: 0 auto; }
 
-        /* Unified Section Card Style (全站统一蓝色边框) */
+        /* Unified Section Card Style */
         .section-card {
             background: #ffffff;
             padding: 25px;
@@ -71,6 +94,10 @@
         .nav-pills .nav-link { border-radius: 20px; color: #5f6368; padding: 10px 24px; font-weight: 600; margin: 0 5px; }
         .nav-pills .nav-link.active { background-color: var(--primary-blue); color: white; }
         .collapsed .sidebar-text { display: none; }
+
+        /* References list spacing */
+        .ref-meta { color: #5f6368; font-size: 0.9rem; }
+        .ref-title { font-weight: 700; }
     </style>
 </head>
 <body class="tex2jax_ignore">
@@ -132,12 +159,17 @@
                 <ul class="nav nav-pills mb-5 justify-content-center" id="resultsTab">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-gaps">Research Gaps</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-ideas">Ideas</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-evaluation">Evaluation</button></li> <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="pill" data-bs-target="#tab-draft">Final Draft</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-evaluation">Evaluation</button></li>
+
+                    <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="pill" data-bs-target="#tab-draft">Final Draft</button></li>
                 </ul>
+
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tab-gaps"></div>
                     <div class="tab-pane fade" id="tab-ideas"></div>
-                    <div class="tab-pane fade" id="tab-evaluation"></div> <div class="tab-pane fade" id="tab-draft"></div>
+                    <div class="tab-pane fade" id="tab-evaluation"></div>
+
+                    <div class="tab-pane fade" id="tab-draft"></div>
                 </div>
             </div>
         </div>
@@ -147,20 +179,54 @@
     <script>
         const sidebar = document.getElementById('sidebar');
         const mainWrapper = document.getElementById('main-wrapper');
-        document.getElementById('toggleSidebar').onclick = () => { sidebar.classList.toggle('collapsed'); mainWrapper.classList.toggle('expanded'); };
+        document.getElementById('toggleSidebar').onclick = () => {
+            sidebar.classList.toggle('collapsed');
+            mainWrapper.classList.toggle('expanded');
+        };
 
         let currentTaskId = null;
         let pollInterval = null;
+        let latestDraftCache = null; // store the full draft.json in memory
+
+        function escapeHtml(s) {
+            return String(s ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function textToHtmlParagraphs(text) {
+            const safe = escapeHtml(text || '');
+            // Convert blank-line separated paragraphs into <p>, preserve single newlines as <br>
+            const parts = safe.split(/\n\s*\n/g).map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return '<p class="text-muted mb-0">No content.</p>';
+            return parts.map(p => `<p>${p.replaceAll('\n', '<br>')}</p>`).join('');
+        }
+
+        function maybeTypeset(container) {
+            if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+                MathJax.typesetPromise([container]).catch(() => {});
+            }
+        }
 
         async function createTask() {
             const topic = document.getElementById('topicInput').value;
             const maxPapers = document.getElementById('paperCount').value;
             if (!topic) return alert("Please specify a topic.");
+
             document.getElementById('startBtn').disabled = true;
             document.getElementById('statusArea').classList.remove('d-none');
             document.getElementById('statusArea').style.opacity = '1';
             document.getElementById('resultArea').classList.add('d-none');
-            const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ topic, max_papers: parseInt(maxPapers) }) });
+
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ topic, max_papers: parseInt(maxPapers) })
+            });
+
             const data = await res.json();
             currentTaskId = data.task_id;
             startPolling(currentTaskId);
@@ -172,21 +238,53 @@
             pollInterval = setInterval(async () => {
                 const res = await fetch(`/api/tasks/${taskId}/status`);
                 const s = await res.json();
+
                 document.getElementById('progressBar').style.width = (s.progress * 100) + '%';
                 document.getElementById('progressText').innerText = Math.round(s.progress * 100) + '%';
                 document.getElementById('statusText').innerText = s.message;
-                const details = { "gap_mining": "Phase 1/4: Scanning arXiv...", "idea_generation": "Phase 2/4: Brainstorming...", "idea_evaluation": "Phase 3/4: Scoring...", "paper_drafting": "Phase 4/4: Drafting...", "completed": "Done!" };
+
+                const details = {
+                    "gap_mining": "Phase 1/4: Scanning arXiv...",
+                    "idea_generation": "Phase 2/4: Brainstorming...",
+                    "idea_evaluation": "Phase 3/4: Scoring...",
+                    "paper_drafting": "Phase 4/4: Drafting...",
+                    "completed": "Done!"
+                };
                 document.getElementById('stageDetail').innerText = details[s.stage] || "Processing...";
-                if (s.status === 'completed') { clearInterval(pollInterval); loadAllResults(taskId); document.getElementById('startBtn').disabled = false; setTimeout(() => { const sa = document.getElementById('statusArea'); sa.style.transition = 'opacity 0.8s'; sa.style.opacity = '0'; setTimeout(() => sa.classList.add('d-none'), 800); }, 2500); }
+
+                if (s.status === 'completed') {
+                    clearInterval(pollInterval);
+                    await loadAllResults(taskId);
+                    document.getElementById('startBtn').disabled = false;
+
+                    setTimeout(() => {
+                        const sa = document.getElementById('statusArea');
+                        sa.style.transition = 'opacity 0.8s';
+                        sa.style.opacity = '0';
+                        setTimeout(() => sa.classList.add('d-none'), 800);
+                    }, 2500);
+                }
             }, 2000);
         }
 
         async function loadAllResults(taskId) {
             document.getElementById('resultArea').classList.remove('d-none');
-            const stages = ['gaps', 'ideas', 'evaluation', 'draft'];
-            for (const stage of stages) {
+
+            // 1) Load stages that already have their own endpoints
+            const basicStages = ['gaps', 'ideas', 'evaluation'];
+            for (const stage of basicStages) {
                 const res = await fetch(`/api/tasks/${taskId}/result/${stage}`);
                 if (res.ok) renderStage(stage, await res.json());
+            }
+
+            // 2) Load draft once, then fan out to multiple tabs
+            const draftRes = await fetch(`/api/tasks/${taskId}/result/draft`);
+            if (draftRes.ok) {
+                const draft = await draftRes.json();
+                latestDraftCache = draft;
+
+                renderStage('draft', draft);
+
             }
         }
 
@@ -196,34 +294,197 @@
             container.innerHTML = '';
 
             if (stage === 'gaps') {
-                container.innerHTML = data.research_gaps.map((g, i) => `
+                container.innerHTML = (data.research_gaps || []).map((g, i) => `
                     <div class="section-card">
-                        <h5 class="fw-bold text-primary">Gap ${i+1}: ${g.description}</h5>
-                        <p class="mb-0 text-muted">${g.why_important}</p>
+                        <h5 class="fw-bold text-primary">Gap ${i+1}: ${escapeHtml(g.description)}</h5>
+                        <p class="mb-0 text-muted">${escapeHtml(g.why_important)}</p>
                     </div>`).join('');
+
             } else if (stage === 'ideas') {
-                container.innerHTML = data.ideas.map((i, idx) => `
+                container.innerHTML = (data.ideas || []).map((i, idx) => `
                     <div class="section-card">
-                        <h5 class="fw-bold">Idea ${idx+1}: ${i.working_title}</h5>
-                        <p class="text-secondary small mb-2">${i.problem_statement}</p>
-                        <div class="bg-light p-3 rounded border-start border-success border-3"><strong>Innovation:</strong> ${i.novelty}</div>
+                        <h5 class="fw-bold">Idea ${idx+1}: ${escapeHtml(i.working_title)}</h5>
+                        <p class="text-secondary small mb-2">${escapeHtml(i.problem_statement)}</p>
+                        <div class="bg-light p-3 rounded border-start border-success border-3">
+                            <strong>Innovation:</strong> ${escapeHtml(i.novelty)}
+                        </div>
                     </div>`).join('');
+
             } else if (stage === 'evaluation') {
-                // 现在 Evaluation 条目也使用了蓝色边框卡片样式
-                container.innerHTML = data.evaluations.map(ev => `
+                container.innerHTML = (data.evaluations || []).map(ev => `
                     <div class="section-card d-flex justify-content-between align-items-start">
-                        <div><h5 class="fw-bold">Review for ${ev.idea_id}</h5><p class="text-muted mb-0 small">${ev.justification}</p></div>
-                        <span class="badge bg-success fs-6 px-3 py-2 rounded-pill">Score: ${parseFloat(ev.overall_score).toFixed(1)}</span>
+                        <div>
+                            <h5 class="fw-bold">Review for ${escapeHtml(ev.idea_id)}</h5>
+                            <p class="text-muted mb-0 small">${escapeHtml(ev.justification)}</p>
+                        </div>
+                        <span class="badge bg-success fs-6 px-3 py-2 rounded-pill">
+                            Score: ${parseFloat(ev.overall_score).toFixed(1)}
+                        </span>
                     </div>`).join('');
+
             } else if (stage === 'draft') {
+  const relatedWork = (data.related_work ?? '').trim();
+  const conclusion = (data.conclusion ?? '').trim();
+  const refs = Array.isArray(data.references) ? data.references : [];
+
+  // References HTML (supports both object-array and string-array)
+  let refsHtml = '';
+  if (refs.length > 0) {
+    const isObj = typeof refs[0] === 'object' && refs[0] !== null;
+    if (isObj) {
+      refsHtml = `
+        <div class="section-card paper-content">
+          <h5>References</h5>
+          <ol class="mb-0">
+            ${refs.map(r => {
+              const title = escapeHtml(r.title || 'Untitled');
+              const year = escapeHtml(r.year || '');
+              const authors = Array.isArray(r.authors)
+                ? escapeHtml(r.authors.join(', '))
+                : escapeHtml(r.authors || '');
+              const meta = [authors, year].filter(Boolean).join(' · ');
+              const link = r.link
+                ? `<a href="${encodeURI(r.link)}" target="_blank" rel="noopener">Link</a>`
+                : '';
+              return `
+                <li class="mb-3">
+                  <div><strong>${title}</strong></div>
+                  ${meta ? `<div class="text-muted small">${meta}</div>` : ''}
+                  ${link ? `<div class="small mt-1">${link}</div>` : ''}
+                </li>
+              `;
+            }).join('')}
+          </ol>
+        </div>
+      `;
+    } else {
+      refsHtml = `
+        <div class="section-card paper-content">
+          <h5>References</h5>
+          <ol class="mb-0">
+            ${refs.map(x => `<li>${escapeHtml(x)}</li>`).join('')}
+          </ol>
+        </div>
+      `;
+    }
+  } else {
+    // If you prefer: show an empty references section instead of hiding it
+    refsHtml = `
+      <div class="section-card paper-content">
+        <h5>References</h5>
+        <p class="text-muted mb-0">No references returned by backend.</p>
+      </div>
+    `;
+  }
+
+  // Build Final Draft like a real paper, section-by-section
+  container.innerHTML = `
+    <h2 class="text-center fw-bold mb-5 display-6">${escapeHtml(data.title || 'Untitled')}</h2>
+
+    <div class="section-card paper-content">
+      <h5>Abstract</h5>
+      <p>${escapeHtml(data.abstract || '')}</p>
+    </div>
+
+    <div class="section-card paper-content">
+      <h5>1. Introduction</h5>
+      <p>${escapeHtml(data.introduction || '')}</p>
+    </div>
+
+    <div class="section-card paper-content">
+      <h5>2. Methodology</h5>
+      <div>${data.method ?? ''}</div>
+    </div>
+
+    <div class="section-card paper-content">
+      <h5>3. Experiments</h5>
+      <p>${escapeHtml(data.experiments || '')}</p>
+    </div>
+
+    <div class="section-card paper-content">
+      <h5>4. Related Work</h5>
+      ${textToHtmlParagraphs(relatedWork)}
+    </div>
+
+    <div class="section-card paper-content">
+      <h5>5. Conclusion</h5>
+      ${textToHtmlParagraphs(conclusion)}
+    </div>
+
+    ${refsHtml}
+  `;
+
+  maybeTypeset(container);
+
+
+            } else if (stage === 'related_work') {
+                const text = data.related_work || '';
                 container.innerHTML = `
-                    <h2 class="text-center fw-bold mb-5 display-6">${data.title}</h2>
-                    <div class="section-card paper-content"><h5>Abstract</h5><p>${data.abstract}</p></div>
-                    <div class="section-card paper-content"><h5>1. Introduction</h5><p>${data.introduction}</p></div>
-                    <div class="section-card paper-content"><h5>2. Methodology</h5><div>${data.method}</div></div>
-                    <div class="section-card paper-content"><h5>3. Experiments</h5><p>${data.experiments}</p></div>
+                    <div class="section-card paper-content">
+                        <h5>Related Work</h5>
+                        ${textToHtmlParagraphs(text)}
+                    </div>
                 `;
-                if (window.MathJax) MathJax.typesetPromise([container]);
+                maybeTypeset(container);
+
+            } else if (stage === 'conclusion') {
+                const text = data.conclusion || '';
+                container.innerHTML = `
+                    <div class="section-card paper-content">
+                        <h5>Conclusion</h5>
+                        ${textToHtmlParagraphs(text)}
+                    </div>
+                `;
+                maybeTypeset(container);
+
+            } else if (stage === 'references') {
+                const refs = Array.isArray(data.references) ? data.references : [];
+
+                if (refs.length === 0) {
+                    container.innerHTML = `
+                        <div class="section-card paper-content">
+                            <h5>References</h5>
+                            <p class="text-muted mb-0">No references returned by backend.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const isObj = typeof refs[0] === 'object' && refs[0] !== null;
+
+                if (!isObj) {
+                    container.innerHTML = `
+                        <div class="section-card paper-content">
+                            <h5>References</h5>
+                            <ol class="mb-0">
+                                ${refs.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                            </ol>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="section-card paper-content">
+                        <h5>References</h5>
+                        <ol class="mb-0">
+                            ${refs.map(r => {
+                                const title = escapeHtml(r.title || 'Untitled');
+                                const year = escapeHtml(r.year || '');
+                                const authors = Array.isArray(r.authors) ? escapeHtml(r.authors.join(', ')) : escapeHtml(r.authors || '');
+                                const meta = [authors, year].filter(Boolean).join(' · ');
+                                const link = r.link ? `<a href="${encodeURI(r.link)}" target="_blank" rel="noopener">Link</a>` : '';
+                                return `
+                                    <li class="mb-3">
+                                        <div class="ref-title">${title}</div>
+                                        ${meta ? `<div class="ref-meta">${meta}</div>` : ''}
+                                        ${link ? `<div class="small mt-1">${link}</div>` : ''}
+                                    </li>
+                                `;
+                            }).join('')}
+                        </ol>
+                    </div>
+                `;
             }
         }
 
@@ -231,18 +492,47 @@
             const res = await fetch('/api/tasks');
             const tasks = await res.json();
             const list = document.getElementById('taskList');
-            list.innerHTML = tasks.map(t => `<div class="history-item ${currentTaskId === t.task_id ? 'active' : ''}" onclick="viewTask('${t.task_id}')"><i class="bi bi-journal-text me-3 text-primary opacity-75"></i><span class="sidebar-text text-truncate" style="max-width: 170px;">${t.topic}</span><button class="delete-btn" onclick="deleteTask(event, '${t.task_id}')"><i class="bi bi-trash3"></i></button></div>`).join('');
+
+            list.innerHTML = tasks.map(t => `
+                <div class="history-item ${currentTaskId === t.task_id ? 'active' : ''}" onclick="viewTask('${t.task_id}')">
+                    <i class="bi bi-journal-text me-3 text-primary opacity-75"></i>
+                    <span class="sidebar-text text-truncate" style="max-width: 170px;">${escapeHtml(t.topic)}</span>
+                    <button class="delete-btn" onclick="deleteTask(event, '${t.task_id}')"><i class="bi bi-trash3"></i></button>
+                </div>
+            `).join('');
         }
 
-        async function deleteTask(event, taskId) { event.stopPropagation(); if (confirm("Delete permanently?")) { await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' }); if (currentTaskId === taskId) document.getElementById('resultArea').classList.add('d-none'); loadTaskList(); } }
+        async function deleteTask(event, taskId) {
+            event.stopPropagation();
+            if (confirm("Delete permanently?")) {
+                await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+                if (currentTaskId === taskId) document.getElementById('resultArea').classList.add('d-none');
+                loadTaskList();
+            }
+        }
 
         async function viewTask(taskId) {
-            if (currentTaskId === taskId) return; currentTaskId = taskId; if (pollInterval) clearInterval(pollInterval);
-            document.getElementById('statusArea').classList.add('d-none'); document.getElementById('resultArea').classList.add('d-none');
-            const res = await fetch(`/api/tasks/${taskId}/status`); const s = await res.json();
-            if (s.status === 'completed') loadAllResults(taskId); else { document.getElementById('statusArea').classList.remove('d-none'); document.getElementById('statusArea').style.opacity = '1'; startPolling(taskId); }
+            if (currentTaskId === taskId) return;
+            currentTaskId = taskId;
+            if (pollInterval) clearInterval(pollInterval);
+
+            document.getElementById('statusArea').classList.add('d-none');
+            document.getElementById('resultArea').classList.add('d-none');
+
+            const res = await fetch(`/api/tasks/${taskId}/status`);
+            const s = await res.json();
+
+            if (s.status === 'completed') {
+                await loadAllResults(taskId);
+            } else {
+                document.getElementById('statusArea').classList.remove('d-none');
+                document.getElementById('statusArea').style.opacity = '1';
+                startPolling(taskId);
+            }
+
             loadTaskList();
         }
+
         loadTaskList();
     </script>
 </body>
