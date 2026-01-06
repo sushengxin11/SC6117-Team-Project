@@ -1,7 +1,9 @@
-# ArXiv-based Research Ideation and Paper Drafting System
+# RAG-based Research Ideation and Paper Drafting System
 
 This repository contains the implementation of a **RAG-based research ideation and paper drafting system**, developed as part of the **SC6117 Capstone Project**.  
-The system automatically mines research gaps from arXiv papers, generates and evaluates research ideas, and produces a structured paper draft through an interactive web interface.
+This project implements an end-to-end research assistant system based on Retrieval-Augmented Generation (RAG).
+Given a focused research topic, the system automatically retrieves relevant papers, analyzes their limitations, mines research gaps, generates and evaluates research ideas, and finally produces a structured academic paper draft.
+The system is designed to support **iterative research exploration**, with intermediate results (papers, gaps, ideas, evaluations, draft) stored and visualized through a web-based interface.
 
 ---
 
@@ -130,13 +132,32 @@ venv\Scripts\activate
 
 ### 5.3 Install Dependencies
 
-Install the required Python packages:
+Install all required dependencies using **pip**.
+
+> The system depends on PDF parsing, environment variable loading, JSON repair, and LLM interaction libraries.
+> Installing only FastAPI or requests is **not sufficient**.
 
 ```bash
-pip install fastapi uvicorn requests tqdm
+pip install \
+fastapi \
+uvicorn \
+requests \
+tqdm \
+feedparser \
+pydantic \
+python-dotenv \
+PyMuPDF \
+json-repair
 ```
 
-> Additional packages may be required depending on the PDF processing backend and LLM provider.
+**Explanation of key dependencies:**
+
+* `fastapi`, `uvicorn`: backend API server
+* `requests`, `feedparser`: arXiv paper retrieval
+* `python-dotenv`: loading `OPENAI_API_KEY` from `.env`
+* `PyMuPDF` (`fitz`): PDF parsing and full-text extraction
+* `json-repair`: robust recovery from imperfect LLM JSON outputs
+* `pydantic`: data validation for API models
 
 ---
 
@@ -277,23 +298,22 @@ Intermediate results (gaps, ideas, evaluations) are generated sequentially.
 
 ---
 
-### 8.2 Web Interface (Optional)
+### 8.2 Web Interface
 
-A lightweight web interface is provided for interactive usage.
-
-#### Start Backend Server
+#### Start the FastAPI backend:
 
 ```bash
-python -m uvicorn api_server:app --reload --port 8000
+uvicorn api_server:app --reload --port 8000
 ```
 
-#### Access Frontend
+#### Then open your browser:
 
-Open a browser and visit:
+* Main UI (auto-redirect):
+  [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+* Direct UI access:
+  [http://127.0.0.1:8000/ui/index.html](http://127.0.0.1:8000/ui/index.html)
 
-```
-http://127.0.0.1:8000
-```
+The frontend communicates with backend APIs under `/api/*`.
 
 The frontend allows users to:
 
@@ -303,7 +323,25 @@ The frontend allows users to:
 
 ---
 
-## **9. Project Structure**
+## **9. Task Outputs and Intermediate Results
+
+For each submitted task, a unique directory is created under `tasks/`.
+
+Typical outputs include:
+
+| Pipeline Stage  | Output File       |
+| --------------- | ----------------- |
+| Paper Retrieval | `papers.json`     |
+| Gap Mining      | `gaps.json`       |
+| Idea Generation | `ideas.json`      |
+| Idea Evaluation | `evaluation.json` |
+| Paper Drafting  | `draft.json`      |
+
+These files are used both for frontend visualization and debugging.
+
+---
+
+## **10. Project Structure**
 
 ```
 Version3/
@@ -327,7 +365,7 @@ Version3/
 
 ---
 
-## **10. Limitations and Future Work**
+## **11. Limitations and Future Work**
 
 ### Current Limitations
 
