@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thesis Draft Generator</title>
+    <title>Paper Draft Generator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
+    <!-- Favicon -->
+    <link rel="icon" href="logo.png" type="image/png">
 
-
+    <!-- PDF export dependencies (front-end only) -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
     <script>
         window.MathJax = {
@@ -19,33 +23,33 @@
             },
             options: { processHtmlClass: 'tex2jax_process' }
         };
-        
-            function escapeHtml(s) {
-      return String(s ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
 
-    function textToHtmlParagraphs(text) {
-      const safe = escapeHtml(text || '');
-      const parts = safe.split(/\n\s*\n/g).map(p => p.trim()).filter(Boolean);
-      if (parts.length === 0) return '<p class="text-muted mb-0">No content.</p>';
-      return parts.map(p => `<p>${p.replaceAll('\n', '<br>')}</p>`).join('');
-    }
+        function escapeHtml(s) {
+            return String(s ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
 
-    function maybeTypeset(container) {
-      if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
-        MathJax.typesetPromise([container]).catch(() => {});
-      }
-    }
+        function textToHtmlParagraphs(text) {
+            const safe = escapeHtml(text || '');
+            const parts = safe.split(/\n\s*\n/g).map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return '<p class="text-muted mb-0">No content.</p>';
+            return parts.map(p => `<p>${p.replaceAll('\n', '<br>')}</p>`).join('');
+        }
+
+        function maybeTypeset(container) {
+            if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+                MathJax.typesetPromise([container]).catch(() => {});
+            }
+        }
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <style>
-        :root { --sidebar-width: 280px; --sidebar-collapsed-width: 68px; --primary-blue: #1a73e8; }
+        :root { --sidebar-width: 280px; --sidebar-collapsed-width: 68px; --primary-blue: #000000; }
         body { background-color: #f8f9fa; font-family: 'Segoe UI', Roboto, sans-serif; overflow-y: auto; }
 
         /* Sidebar */
@@ -100,6 +104,65 @@
         /* References list spacing */
         .ref-meta { color: #5f6368; font-size: 0.9rem; }
         .ref-title { font-weight: 700; }
+
+        /* Draft action bar */
+        .draft-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+        }
+        .draft-actions .btn {
+            border-radius: 999px;
+            font-weight: 600;
+        }
+        .btn-primary {
+          background-color: #000 !important;
+          border-color: #000 !important;
+          color: #fff !important;
+        }
+
+        .btn-primary:hover,
+        .btn-primary:focus,
+        .btn-primary:active {
+          background-color: #111 !important;
+          border-color: #111 !important;
+          color: #fff !important;
+        }
+
+        /* Sidebar / task list active item: gray highlight */
+        .active,
+        .list-group-item.active,
+        .task-item.active,
+        .sidebar-item.active {
+          background-color: #f2f2f2 !important;
+          color: #000 !important;
+          border-color: #e0e0e0 !important;
+        }
+
+        /* New Task button / card: use same gray scheme as active task */
+        .new-task,
+        .new-task-btn,
+        .task-new,
+        .btn-light {
+          background-color: #f2f2f2 !important;
+          color: #000 !important;
+          border: 1px solid #e0e0e0 !important;
+        }
+
+        /* Hover state (slightly darker gray) */
+        .new-task:hover,
+        .new-task-btn:hover,
+        .task-new:hover,
+        .btn-light:hover {
+          background-color: #e9e9e9 !important;
+        }
+
+        
+
+
+
+
     </style>
 </head>
 <body class="tex2jax_ignore">
@@ -115,10 +178,12 @@
         <div class="content-container tex2jax_process">
             <div class="text-center mt-3 mb-5">
                 <div class="sparkle-container">
-                    <i class="bi bi-stars"></i>
-                    <h1 class="fw-bold d-inline-block m-0" style="font-size: 3.5rem; color: #202124;">Thesis Draft Generator</h1>
+                    <img src="logo.png"
+                         alt="Paper Drafting Generator"
+                         style="height: 56px; width: auto; margin-right: 12px;">
+                    <h1 class="fw-bold d-inline-block m-0" style="font-size: 3.5rem; color: #202124;">Paper Drafting Generator</h1>
                 </div>
-                <p class="text-muted fs-5">Evidence-driven research gap mining and paper drafting, grounded in arXiv literature.</p>
+                <p class="text-muted fs-5">A RAG-based research ideation and paper drafting system, developed as part of the SC6117 Capstone Project, grounded in arXiv literature.</p>
             </div>
 
             <div class="input-card">
@@ -206,7 +271,6 @@
 
         function textToHtmlParagraphs(text) {
             const safe = escapeHtml(text || '');
-            // Convert blank-line separated paragraphs into <p>, preserve single newlines as <br>
             const parts = safe.split(/\n\s*\n/g).map(p => p.trim()).filter(Boolean);
             if (parts.length === 0) return '<p class="text-muted mb-0">No content.</p>';
             return parts.map(p => `<p>${p.replaceAll('\n', '<br>')}</p>`).join('');
@@ -216,6 +280,134 @@
             if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
                 MathJax.typesetPromise([container]).catch(() => {});
             }
+        }
+
+        function stripHtml(html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html || '';
+            return (tmp.textContent || tmp.innerText || '').trim();
+        }
+
+        function buildDraftPlainText(d) {
+            if (!d) return '';
+            const lines = [];
+
+            const title = (d.title || 'Untitled').trim();
+            lines.push(title);
+            lines.push('='.repeat(Math.min(80, Math.max(10, title.length))));
+            lines.push('');
+
+            function addSection(name, content) {
+                const c = (content ?? '').toString().trim();
+                if (!c) return;
+                lines.push(name);
+                lines.push('-'.repeat(Math.min(80, name.length)));
+                lines.push(c);
+                lines.push('');
+            }
+
+            addSection('Abstract', d.abstract || '');
+            addSection('1. Introduction', d.introduction || '');
+            // method may contain HTML
+            addSection('2. Methodology', stripHtml(d.method || ''));
+            addSection('3. Experiments', d.experiments || '');
+            addSection('4. Related Work', d.related_work || '');
+            addSection('5. Conclusion', d.conclusion || '');
+
+            const refs = Array.isArray(d.references) ? d.references : [];
+            lines.push('References');
+            lines.push('----------');
+            if (refs.length === 0) {
+                lines.push('No references returned by backend.');
+            } else {
+                const isObj = typeof refs[0] === 'object' && refs[0] !== null;
+                if (isObj) {
+                    refs.forEach((r, idx) => {
+                        const t = (r.title || 'Untitled').toString().trim();
+                        const year = (r.year || '').toString().trim();
+                        const authors = Array.isArray(r.authors) ? r.authors.join(', ') : (r.authors || '');
+                        const meta = [authors, year].filter(Boolean).join(' · ');
+                        const link = (r.link || '').toString().trim();
+                        lines.push(`[${idx + 1}] ${t}`);
+                        if (meta) lines.push(`    ${meta}`);
+                        if (link) lines.push(`    ${link}`);
+                    });
+                } else {
+                    refs.forEach((x, idx) => lines.push(`[${idx + 1}] ${String(x).trim()}`));
+                }
+            }
+
+            lines.push('');
+            return lines.join('\n');
+        }
+
+        async function copyFinalDraft() {
+            if (!latestDraftCache) {
+                alert("Draft is not loaded yet.");
+                return;
+            }
+            const text = buildDraftPlainText(latestDraftCache);
+            try {
+                await navigator.clipboard.writeText(text);
+                alert("Copied draft to clipboard.");
+            } catch (e) {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                alert("Copied draft to clipboard.");
+            }
+        }
+
+        async function exportFinalDraftPdf() {
+            const content = document.getElementById('draftContent');
+            if (!content) {
+                alert("Draft content is not ready yet.");
+                return;
+            }
+
+            // Build a safe filename
+            const baseTitle = (latestDraftCache?.title || 'final_draft')
+                .replace(/[\/\\?%*:|"<>]/g, '_')
+                .slice(0, 80);
+            const filename = `${baseTitle}.pdf`;
+
+            // Render to canvas
+            const canvas = await html2canvas(content, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                scrollY: -window.scrollY
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+
+            const pdf = new jsPDF('p', 'pt', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            // Fit image to page width
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = - (imgHeight - heightLeft);
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.save(filename);
         }
 
         async function createTask() {
@@ -263,14 +455,11 @@
                 };
                 document.getElementById('stageDetail').innerText = details[s.stage] || "Processing...";
 
-                // Attempt to load and render intermediate results as soon as each file exists.
                 await tryLoadPartialResults(taskId, s.stage);
 
-                // If anything has been rendered, show the result area early.
                 if (loadedStages.size > 0) {
                     document.getElementById('resultArea').classList.remove('d-none');
                 }
-
 
                 if (s.status === 'completed') {
                     clearInterval(pollInterval);
@@ -312,21 +501,17 @@
         async function loadAllResults(taskId) {
             document.getElementById('resultArea').classList.remove('d-none');
 
-            // 1) Load stages that already have their own endpoints
             const basicStages = ['papers', 'gaps', 'ideas', 'evaluation', 'top_idea', 'supporting_papers'];
             for (const stage of basicStages) {
                 const res = await fetch(`/api/tasks/${taskId}/result/${stage}`);
                 if (res.ok) renderStage(stage, await res.json());
             }
 
-            // 2) Load draft once, then fan out to multiple tabs
             const draftRes = await fetch(`/api/tasks/${taskId}/result/draft`);
             if (draftRes.ok) {
                 const draft = await draftRes.json();
                 latestDraftCache = draft;
-
                 renderStage('draft', draft);
-
             }
         }
 
@@ -400,123 +585,132 @@
                 `;
 
             } else if (stage === 'supporting_papers') {
-    const papers = Array.isArray(data) ? data : (data.papers || data.supporting_papers || []);
-    if (papers.length === 0) {
-        container.innerHTML = `<div class="section-card"><p class="text-muted mb-0">No supporting papers.</p></div>`;
-        return;
-    }
-    container.innerHTML = papers.map((p, i) => {
-        const title = escapeHtml(p.title || 'Untitled');
-        const authors = Array.isArray(p.authors) ? escapeHtml(p.authors.join(', ')) : '';
-        const year = escapeHtml(p.year || '');
-        const link = p.link ? `<a href="${encodeURI(p.link)}" target="_blank" rel="noopener">Link</a>` : '';
-        const pdf = p.pdf_url ? `<a href="${encodeURI(p.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : '';
-        const links = [link, pdf].filter(Boolean).join(' · ');
-        const meta = [authors, year].filter(Boolean).join(' · ');
-        return `
-            <div class="section-card">
-                <h5 class="fw-bold">Support ${i+1}: ${title}</h5>
-                ${meta ? `<div class="text-muted small mb-2">${meta}</div>` : ''}
-                ${links ? `<div class="small">${links}</div>` : ''}
-                ${p.summary ? `<div class="mt-2">${escapeHtml(p.summary)}</div>` : ''}
-            </div>
-        `;
-    }).join('');
-}
- else if (stage === 'draft') {
-  const relatedWork = (data.related_work ?? '').trim();
-  const conclusion = (data.conclusion ?? '').trim();
-  const refs = Array.isArray(data.references) ? data.references : [];
+                const papers = Array.isArray(data) ? data : (data.papers || data.supporting_papers || []);
+                if (papers.length === 0) {
+                    container.innerHTML = `<div class="section-card"><p class="text-muted mb-0">No supporting papers.</p></div>`;
+                    return;
+                }
+                container.innerHTML = papers.map((p, i) => {
+                    const title = escapeHtml(p.title || 'Untitled');
+                    const authors = Array.isArray(p.authors) ? escapeHtml(p.authors.join(', ')) : '';
+                    const year = escapeHtml(p.year || '');
+                    const link = p.link ? `<a href="${encodeURI(p.link)}" target="_blank" rel="noopener">Link</a>` : '';
+                    const pdf = p.pdf_url ? `<a href="${encodeURI(p.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : '';
+                    const links = [link, pdf].filter(Boolean).join(' · ');
+                    const meta = [authors, year].filter(Boolean).join(' · ');
+                    return `
+                        <div class="section-card">
+                            <h5 class="fw-bold">Support ${i+1}: ${title}</h5>
+                            ${meta ? `<div class="text-muted small mb-2">${meta}</div>` : ''}
+                            ${links ? `<div class="small">${links}</div>` : ''}
+                            ${p.summary ? `<div class="mt-2">${escapeHtml(p.summary)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
 
-  // References HTML (supports both object-array and string-array)
-  let refsHtml = '';
-  if (refs.length > 0) {
-    const isObj = typeof refs[0] === 'object' && refs[0] !== null;
-    if (isObj) {
-      refsHtml = `
-        <div class="section-card paper-content">
-          <h5>References</h5>
-          <ol class="mb-0">
-            ${refs.map(r => {
-              const title = escapeHtml(r.title || 'Untitled');
-              const year = escapeHtml(r.year || '');
-              const authors = Array.isArray(r.authors)
-                ? escapeHtml(r.authors.join(', '))
-                : escapeHtml(r.authors || '');
-              const meta = [authors, year].filter(Boolean).join(' · ');
-              const link = r.link
-                ? `<a href="${encodeURI(r.link)}" target="_blank" rel="noopener">Link</a>`
-                : '';
-              return `
-                <li class="mb-3">
-                  <div><strong>${title}</strong></div>
-                  ${meta ? `<div class="text-muted small">${meta}</div>` : ''}
-                  ${link ? `<div class="small mt-1">${link}</div>` : ''}
-                </li>
-              `;
-            }).join('')}
-          </ol>
-        </div>
-      `;
-    } else {
-      refsHtml = `
-        <div class="section-card paper-content">
-          <h5>References</h5>
-          <ol class="mb-0">
-            ${refs.map(x => `<li>${escapeHtml(x)}</li>`).join('')}
-          </ol>
-        </div>
-      `;
-    }
-  } else {
-    // If you prefer: show an empty references section instead of hiding it
-    refsHtml = `
-      <div class="section-card paper-content">
-        <h5>References</h5>
-        <p class="text-muted mb-0">No references returned by backend.</p>
-      </div>
-    `;
-  }
+            } else if (stage === 'draft') {
+                const relatedWork = (data.related_work ?? '').trim();
+                const conclusion = (data.conclusion ?? '').trim();
+                const refs = Array.isArray(data.references) ? data.references : [];
 
-  // Build Final Draft like a real paper, section-by-section
-  container.innerHTML = `
-    <h2 class="text-center fw-bold mb-5 display-6">${escapeHtml(data.title || 'Untitled')}</h2>
+                let refsHtml = '';
+                if (refs.length > 0) {
+                    const isObj = typeof refs[0] === 'object' && refs[0] !== null;
+                    if (isObj) {
+                        refsHtml = `
+                            <div class="section-card paper-content">
+                                <h5>References</h5>
+                                <ol class="mb-0">
+                                    ${refs.map(r => {
+                                        const title = escapeHtml(r.title || 'Untitled');
+                                        const year = escapeHtml(r.year || '');
+                                        const authors = Array.isArray(r.authors)
+                                            ? escapeHtml(r.authors.join(', '))
+                                            : escapeHtml(r.authors || '');
+                                        const meta = [authors, year].filter(Boolean).join(' · ');
+                                        const link = r.link
+                                            ? `<a href="${encodeURI(r.link)}" target="_blank" rel="noopener">Link</a>`
+                                            : '';
+                                        return `
+                                            <li class="mb-3">
+                                                <div><strong>${title}</strong></div>
+                                                ${meta ? `<div class="text-muted small">${meta}</div>` : ''}
+                                                ${link ? `<div class="small mt-1">${link}</div>` : ''}
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ol>
+                            </div>
+                        `;
+                    } else {
+                        refsHtml = `
+                            <div class="section-card paper-content">
+                                <h5>References</h5>
+                                <ol class="mb-0">
+                                    ${refs.map(x => `<li>${escapeHtml(x)}</li>`).join('')}
+                                </ol>
+                            </div>
+                        `;
+                    }
+                } else {
+                    refsHtml = `
+                        <div class="section-card paper-content">
+                            <h5>References</h5>
+                            <p class="text-muted mb-0">No references returned by backend.</p>
+                        </div>
+                    `;
+                }
 
-    <div class="section-card paper-content">
-      <h5>Abstract</h5>
-      <p>${escapeHtml(data.abstract || '')}</p>
-    </div>
+                // Action bar + Draft content wrapper for PDF export
+                container.innerHTML = `
+                    <div class="draft-actions">
+                        <button class="btn btn-outline-dark btn-sm px-3" onclick="copyFinalDraft()">
+                            <i class="bi bi-clipboard me-1"></i> Copy Draft
+                        </button>
+                        <button class="btn btn-outline-dark btn-sm px-3 export-pdf-btn" onclick="exportFinalDraftPdf()">
+                            <i class="bi bi-filetype-pdf me-1"></i> Export PDF
+                        </button>
+                    </div>
 
-    <div class="section-card paper-content">
-      <h5>1. Introduction</h5>
-      <p>${escapeHtml(data.introduction || '')}</p>
-    </div>
+                    <div id="draftContent">
+                        <h2 class="text-center fw-bold mb-5 display-6">${escapeHtml(data.title || 'Untitled')}</h2>
 
-    <div class="section-card paper-content">
-      <h5>2. Methodology</h5>
-      <div>${data.method ?? ''}</div>
-    </div>
+                        <div class="section-card paper-content">
+                            <h5>Abstract</h5>
+                            <p>${escapeHtml(data.abstract || '')}</p>
+                        </div>
 
-    <div class="section-card paper-content">
-      <h5>3. Experiments</h5>
-      <p>${escapeHtml(data.experiments || '')}</p>
-    </div>
+                        <div class="section-card paper-content">
+                            <h5>1. Introduction</h5>
+                            <p>${escapeHtml(data.introduction || '')}</p>
+                        </div>
 
-    <div class="section-card paper-content">
-      <h5>4. Related Work</h5>
-      ${textToHtmlParagraphs(relatedWork)}
-    </div>
+                        <div class="section-card paper-content">
+                            <h5>2. Methodology</h5>
+                            <div>${data.method ?? ''}</div>
+                        </div>
 
-    <div class="section-card paper-content">
-      <h5>5. Conclusion</h5>
-      ${textToHtmlParagraphs(conclusion)}
-    </div>
+                        <div class="section-card paper-content">
+                            <h5>3. Experiments</h5>
+                            <p>${escapeHtml(data.experiments || '')}</p>
+                        </div>
 
-    ${refsHtml}
-  `;
+                        <div class="section-card paper-content">
+                            <h5>4. Related Work</h5>
+                            ${textToHtmlParagraphs(relatedWork)}
+                        </div>
 
-  maybeTypeset(container);
+                        <div class="section-card paper-content">
+                            <h5>5. Conclusion</h5>
+                            ${textToHtmlParagraphs(conclusion)}
+                        </div>
 
+                        ${refsHtml}
+                    </div>
+                `;
+
+                const draftContentEl = document.getElementById('draftContent');
+                if (draftContentEl) maybeTypeset(draftContentEl);
 
             } else if (stage === 'related_work') {
                 const text = data.related_work || '';
@@ -640,3 +834,4 @@
     </script>
 </body>
 </html>
+
